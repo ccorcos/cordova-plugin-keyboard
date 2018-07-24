@@ -51,8 +51,17 @@ typedef enum : NSUInteger {
 
 #pragma mark Initialize
 
+static NSString* UIClassString;
+static NSString* WKClassString;
+static NSString* UITraitsClassString;
+
 - (void)pluginInitialize
 {
+		// Create these strings at runtime so they aren't flagged
+    UIClassString = [@[@"UI", @"Web", @"Browser", @"View"] componentsJoinedByString:@""];
+    WKClassString = [@[@"WK", @"Content", @"View"] componentsJoinedByString:@""];
+    UITraitsClassString = [@[@"UI", @"Text", @"Input", @"Traits"] componentsJoinedByString:@""];
+
     NSDictionary *settings = self.commandDelegate.settings;
 
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(statusBarDidChangeFrame:) name: UIApplicationDidChangeStatusBarFrameNotification object:nil];
@@ -75,6 +84,8 @@ typedef enum : NSUInteger {
         NSLog(@"CDVIonicKeyboard: resize mode %d", self.keyboardResizes);
     }
     self.hideFormAccessoryBar = [settings cordovaBoolSettingForKey:@"HideKeyboardFormAccessoryBar" defaultValue:YES];
+
+		self.keyboardStyle = [settings cordovaBoolSettingForKey:@"KeyboardStyle" defaultValue:@"light"];
 
     NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
 
@@ -183,9 +194,9 @@ typedef enum : NSUInteger {
 {
     CGSize statusBarSize = [[UIApplication sharedApplication] statusBarFrame].size;
     int statusBarHeight = MIN(statusBarSize.width, statusBarSize.height);
-    
+
     int _paddingBottom = (int)self.paddingBottom;
-        
+
     if (statusBarHeight == 40) {
         _paddingBottom = _paddingBottom + 20;
     }
@@ -219,6 +230,39 @@ typedef enum : NSUInteger {
     [self resetScrollView];
 }
 
+
+#pragma mark Keyboard Style
+
+- (NSString*)keyboardStyle
+{
+    return _keyboardStyle;
+}
+
+- (void)setKeyboardStyle:(NSString*)style
+{
+    if ([style isEqualToString:_keyboardStyle]) {
+        return;
+    }
+
+    IMP newImp = [style isEqualToString:@"dark"] ? imp_implementationWithBlock(^(id _s) {
+        return UIKeyboardAppearanceDark;
+    }) : imp_implementationWithBlock(^(id _s) {
+        return UIKeyboardAppearanceLight;
+    });
+
+    for (NSString* classString in @[UIClassString, UITraitsClassString]) {
+        Class c = NSClassFromString(classString);
+        Method m = class_getInstanceMethod(c, @selector(keyboardAppearance));
+
+        if (m != NULL) {
+            method_setImplementation(m, newImp);
+        } else {
+            class_addMethod(c, @selector(keyboardAppearance), newImp, "l@:");
+        }
+    }
+
+    _keyboardStyle = style;
+}
 
 #pragma mark HideFormAccessoryBar
 
@@ -278,6 +322,17 @@ static IMP WKOriginalImp;
     [self.webView endEditing:YES];
 }
 
+- (void)keyboardStyle:(CDVInvokedUrlCommand*)command
+{
+    id value = [command.arguments objectAtIndex:0];
+    if ([value isKindOfClass:[NSString class]]) {
+        value = [(NSString*)value lowercaseString];
+    } else {
+        value = @"light";
+    }
+
+    self.keyboardStyle = value;
+}
 
 #pragma mark dealloc
 

@@ -80,6 +80,10 @@ Keyboard.hide = function () {
     exec(null, null, "Keyboard", "hide", []);
 };
 
+Keyboard.keyboardStyle = function(style) {
+    exec(null, null, "Keyboard", "keyboardStyle", [style]);
+};
+
 Keyboard.show = function () {
     console.warn('Showing keyboard not supported in iOS due to platform limitations.');
     console.warn('Instead, use input.focus(), and ensure that you have the following setting in your config.xml: \n');
